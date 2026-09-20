@@ -2,277 +2,59 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UGV Autonomous Navigation Prototype</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GPS-Denied UGV - Risk-Aware Navigation Prototype</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;background:#071018;color:#dbeafe;font-family:Inter,Segoe UI,Arial,sans-serif;overflow:hidden}
-.header{height:64px;background:#0b1520;border-bottom:1px solid #203244;display:flex;align-items:center;padding:0 24px;gap:14px}
-.dot{width:12px;height:12px;border-radius:50%;background:#22d3ee;box-shadow:0 0 14px #22d3ee}
-.title{font-size:19px;font-weight:700;letter-spacing:.3px}
-.sub{font-size:12px;color:#7f95aa;margin-left:auto}
-.app{height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(650px,1fr) 360px;gap:18px;padding:18px}
-.mapbox{position:relative;border:1px solid #24384b;border-radius:12px;background:#09131d;overflow:hidden;min-height:600px}
-canvas{width:100%;height:100%;display:block}
-.panel{border:1px solid #24384b;border-radius:12px;background:#0b1621;padding:18px;overflow:auto}
-.section{border-bottom:1px solid #203244;padding-bottom:14px;margin-bottom:14px}
-h2{font-size:14px;margin:0 0 12px;color:#93a9bd;text-transform:uppercase;letter-spacing:1px}
-.row{display:flex;justify-content:space-between;gap:12px;margin:9px 0;font-size:13px}
-.val{color:#fff;font-weight:600;text-align:right}
-.good{color:#4ade80}.warn{color:#fbbf24}.danger{color:#fb7185}.cyan{color:#22d3ee}
-.decision{font-size:24px;font-weight:800;letter-spacing:1px;margin:5px 0}
-.reason{font-size:13px;line-height:1.5;color:#a9bbca}
-button{border:1px solid #31506a;background:#122435;color:#dbeafe;border-radius:7px;padding:9px 14px;margin-right:8px;cursor:pointer}
-button:hover{background:#183047}
-.badge{display:inline-block;padding:4px 8px;border-radius:20px;background:#102b38;color:#67e8f9;font-size:11px}
-.legend{position:absolute;left:16px;bottom:14px;background:rgba(7,16,24,.86);border:1px solid #294053;border-radius:8px;padding:9px 12px;font-size:11px;line-height:1.8}
-.dot2{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
-@media(max-width:900px){body{overflow:auto}.app{grid-template-columns:1fr}.mapbox{height:65vh}.panel{min-height:500px}}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#12161c;color:#ebEEF2;font-family:Arial,Segoe UI,sans-serif}.app{width:100vw;height:100vh;display:flex;flex-direction:column}.header{height:58px;flex:0 0 58px;display:flex;align-items:center;padding:0 24px;background:#12161c;border-bottom:1px solid #2d333d}.header h1{font-size:24px;margin:0;font-weight:700}.main{flex:1;display:flex;min-height:0}.map{position:relative;flex:1;min-width:0;background:#161b21}.map canvas{width:100%;height:100%;display:block}.panel{width:330px;flex:0 0 330px;background:#1b2028;border-left:2px solid #2d333d;padding:20px 20px;overflow:hidden}.title{font-size:22px;font-weight:700;margin-bottom:18px}.small{font-size:14px;color:#a0aab6}.section{margin-bottom:19px}.section h2{font-size:16px;margin:0 0 10px;color:#ebEEF2}.line{height:1px;background:#343b45;margin:14px 0}.row{display:flex;justify-content:space-between;gap:10px;margin:8px 0;font-size:15px}.right{text-align:right}.big{font-size:28px;font-weight:700;margin:7px 0 10px}.reason{font-size:14px;line-height:1.45;color:#d0d5dc}.controls{margin-top:18px;font-size:14px;line-height:1.7;color:#aeb7c2}.event{font-size:14px;line-height:1.45;color:#e6e9ed}.buttonbar{position:absolute;right:14px;bottom:12px;display:flex;gap:8px}.buttonbar button{background:#202833;border:1px solid #46515e;color:#fff;border-radius:5px;padding:7px 12px;cursor:pointer}.buttonbar button:hover{background:#2b3440}.green{color:#50b464}.yellow{color:#f0cd50}.cyan{color:#46bed2}.red{color:#ff6666}.muted{color:#a0aab6}.pill{display:inline-block;padding:3px 7px;border:1px solid #3d5660;border-radius:12px;color:#46bed2;font-size:11px;margin-left:6px}
 </style>
 </head>
 <body>
-<header class="header">
-  <span class="dot"></span>
-  <div class="title">GPS-DENIED UGV — RISK-AWARE NAVIGATION PROTOTYPE</div>
-  <div class="sub">Autonomous Navigation • Dynamic Obstacle Avoidance</div>
-</header>
-
 <div class="app">
-  <div class="mapbox">
-    <canvas id="map"></canvas>
-    <div class="legend">
-      <div><span class="dot2" style="background:#22d3ee"></span>Planned route</div>
-      <div><span class="dot2" style="background:#4ade80"></span>UGV + safety corridor</div>
-      <div><span class="dot2" style="background:#fb7185"></span>Dynamic obstacle</div>
-      <div><span class="dot2" style="background:#64748b"></span>Static obstacle</div>
-    </div>
-  </div>
-
+ <header class="header"><h1>GPS-DENIED UGV — RISK-AWARE NAVIGATION PROTOTYPE</h1></header>
+ <main class="main">
+  <div class="map"><canvas id="cv"></canvas><div class="buttonbar"><button id="pause">P Pause</button><button id="reset">R Reset</button></div></div>
   <aside class="panel">
-    <div class="section">
-      <h2>System Status</h2>
-      <div class="row"><span>UGV Position</span><span class="val" id="pos">--</span></div>
-      <div class="row"><span>Goal</span><span class="val">(900, 560)</span></div>
-      <div class="row"><span>Perception</span><span class="val good">ACTIVE</span></div>
-      <div class="row"><span>Risk Engine</span><span class="val good">ACTIVE</span></div>
-      <div class="row"><span>Localization</span><span class="val cyan" id="loc">96%</span></div>
-      <div class="row"><span>Moving Objects</span><span class="val" id="obj">4</span></div>
-    </div>
-
-    <div class="section">
-      <h2>Navigation Decision</h2>
-      <div class="decision cyan" id="decision">FOLLOW ROUTE</div>
-      <div class="reason" id="reason">Route clear. Monitoring dynamic environment.</div>
-      <div class="row" style="margin-top:14px"><span>Risk Score</span><span class="val good" id="risk">12 / 100</span></div>
-    </div>
-
-    <div class="section">
-      <h2>Autonomous Control</h2>
-      <button id="pause">Pause</button>
-      <button id="reset">Reset</button>
-      <span class="badge">AUTO MODE</span>
-      <div class="reason" style="margin-top:12px">
-        The UGV predicts whether moving obstacles will enter its safety corridor.
-        When risk becomes high, the route is automatically replanned before the obstacle reaches the vehicle.
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Event Log</h2>
-      <div id="log" class="reason">System initialized.<br>Dynamic perception online.</div>
-    </div>
+   <div class="title">SYSTEM STATUS</div>
+   <div class="section"><div class="row"><span>UGV POSITION</span><span id="pos" class="right">Grid: (2, 2)</span></div><div class="row"><span>GOAL</span><span class="right">Grid: (21, 26)</span></div></div>
+   <div class="section"><div class="line"></div><h2>PERCEPTION</h2><div class="row"><span>Obstacles</span><span id="obs" class="right">0</span></div><div class="row"><span>Terrain</span><span class="right">68% traversable</span></div></div>
+   <div class="section"><div class="line"></div><h2>RISK ENGINE</h2><div class="row"><span>Risk score</span><span id="risk" class="right green">18/100</span></div><div class="row"><span>Safety margin</span><span id="margin" class="right">NORMAL</span></div></div>
+   <div class="section"><div class="line"></div><h2>LOCALIZATION</h2><div class="row"><span>Visual confidence</span><span id="conf" class="right cyan">92%</span></div></div>
+   <div class="section"><div class="line"></div><h2>DECISION</h2><div id="decision" class="big cyan">CONTINUE</div><div class="reason" id="reason">Current route has low predicted collision risk.</div></div>
+   <div class="section"><div class="line"></div><h2>EVENT LOG</h2><div class="event" id="event">MISSION STARTED</div></div>
+   <div class="controls"><div class="line"></div><b>CONTROLS</b><br>R = Reset simulation<br>P = Pause / Resume</div>
   </aside>
+ </main>
 </div>
-
 <script>
-const c=document.getElementById("map"),ctx=c.getContext("2d");
-let W=1000,H=650,dpr=1;
-function resize(){
-  const r=c.getBoundingClientRect(); dpr=devicePixelRatio||1;
-  c.width=r.width*dpr;c.height=r.height*dpr;W=r.width;H=r.height;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-}
-addEventListener("resize",resize);resize();
-
-const start={x:80,y:575},goal={x:900,y:70};
-let ugv={x:start.x,y:start.y}, paused=false, replanning=false, finished=false;
-let routeMode=0, lastTime=performance.now(), eventText="System initialized.<br>Dynamic perception online.";
-const staticObs=[
- {x:180,y:120,w:120,h:170},{x:420,y:80,w:120,h:125},
- {x:650,y:205,w:150,h:105},{x:300,y:420,w:160,h:95},
- {x:700,y:440,w:120,h:120}
+const canvas=document.getElementById('cv'),ctx=canvas.getContext('2d');
+const ROWS=24,COLS=29,START=[2,2],GOAL=[21,26],fixed=new Set([
+'4,7','5,7','6,7','7,7','8,7','8,8','8,9','8,10','13,5','14,5','15,5','16,5','16,6','16,7','5,18','6,18','7,18','8,18','9,18','9,19','9,20','9,21','17,14','17,15','17,16','18,16','19,16'
+]);
+let cell=25,ox=25,oy=42,paused=false,complete=false,ugv=[...START],path=[],idx=0,moveTimer=0,replanCooldown=0,eventTimer=2.5,lastThreat=false;
+const baseDyn=[
+ {r:3,c:10,dr:0,dc:1,speed:4.2,t:0},
+ {r:6,c:18,dr:1,dc:0,speed:3.8,t:0},
+ {r:11,c:23,dr:0,dc:-1,speed:4.0,t:0},
+ {r:16,c:8,dr:-1,dc:0,speed:3.6,t:0}
 ];
-const dyn=[
- {x:280,y:350,vx:115,vy:0,phase:0},
- {x:560,y:320,vx:-130,vy:0,phase:1},
- {x:500,y:175,vx:0,vy:115,phase:2},
- {x:820,y:300,vx:0,vy:-125,phase:3}
-];
-
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-function rectDist(px,py,r){
- const dx=Math.max(r.x-px,0,px-(r.x+r.w));
- const dy=Math.max(r.y-py,0,py-(r.y+r.h));
- return Math.hypot(dx,dy);
-}
-function addLog(s){eventText=s+"<br>"+eventText.split("<br>").slice(0,3).join("<br>");document.getElementById("log").innerHTML=eventText}
-
-function moveDyn(dt){
- dyn.forEach((o,i)=>{
-   o.x+=o.vx*dt;o.y+=o.vy*dt;
-   if(o.vx && (o.x<140||o.x>850)){o.vx*=-1}
-   if(o.vy && (o.y<90||o.y>520)){o.vy*=-1}
- });
-}
-
-function riskCheck(){
- let min=999, threat=null;
- dyn.forEach(o=>{
-   const d=dist(ugv,{x:o.x,y:o.y});
-   if(d<min){min=d;threat=o}
- });
- let risk=clamp(Math.round(100-(min-35)*1.15),8,96);
- const corridor=115;
- let near=false;
- dyn.forEach(o=>{
-   const future={x:o.x+o.vx*0.9,y:o.y+o.vy*0.9};
-   if(dist(ugv,future)<corridor) near=true;
- });
- if(near && !replanning && !finished){
-   replanning=true;routeMode=1;
-   addLog("<span class='danger'>REPLAN TRIGGERED</span> — moving obstacle predicted inside safety corridor.");
-   document.getElementById("decision").textContent="REPLAN";
-   document.getElementById("decision").className="decision danger";
-   document.getElementById("reason").textContent="Predictive collision risk detected. Generating safer route around dynamic obstacle.";
- }
- if(!near && replanning){
-   replanning=false;
-   document.getElementById("decision").textContent="FOLLOW REPLANNED ROUTE";
-   document.getElementById("decision").className="decision good";
-   document.getElementById("reason").textContent="New route is clear. Autonomous navigation resumed.";
-   addLog("<span class='good'>ROUTE CLEAR</span> — continuing on replanned path.");
- }
- return {risk,min};
-}
-
-function routePoint(){
-  if(routeMode===0){
-    // smooth diagonal with waypoint
-    const t=clamp((ugv.y-start.y)/(goal.y-start.y),0,1);
-    return {x:start.x+(goal.x-start.x)*t,y:ugv.y-100};
-  } else {
-    // deliberately bend around the middle of the map after replan
-    if(ugv.x<430) return {x:430,y:560};
-    if(ugv.x<650) return {x:610,y:500};
-    return {x:goal.x,y:goal.y};
-  }
-}
-
-function update(dt){
- if(paused||finished)return;
- moveDyn(dt);
- const rc=riskCheck();
- let target=routePoint();
- // General goal seeking with simple route waypoints
- if(routeMode===0){
-   target={x:goal.x,y:goal.y};
- } else {
-   if(ugv.x<430) target={x:430,y:560};
-   else if(ugv.x<650) target={x:610,y:500};
-   else target=goal;
- }
- const dx=target.x-ugv.x,dy=target.y-ugv.y,d=Math.hypot(dx,dy);
- const speed=145;
- if(d>3){ugv.x+=dx/d*speed*dt;ugv.y+=dy/d*speed*dt}
- if(dist(ugv,goal)<12 && !finished){
-   finished=true;
-   document.getElementById("decision").textContent="MISSION COMPLETE";
-   document.getElementById("decision").className="decision good";
-   document.getElementById("reason").textContent="UGV reached the target while avoiding dynamic hazards.";
-   addLog("<span class='good'>MISSION COMPLETE</span>");
- }
- document.getElementById("pos").textContent=`(${Math.round(ugv.x)}, ${Math.round(ugv.y)})`;
- document.getElementById("risk").textContent=`${rc.risk} / 100`;
- document.getElementById("risk").className="val "+(rc.risk>70?"danger":rc.risk>40?"warn":"good");
- document.getElementById("loc").textContent=`${Math.round(96-Math.min(rc.risk,60)*0.12)}%`;
-}
-
-function line(points,dash=false){
- ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
- ctx.setLineDash(dash?[8,8]:[]);ctx.stroke();ctx.setLineDash([]);
-}
-function draw(){
- ctx.clearRect(0,0,W,H);
- ctx.fillStyle="#09131d";ctx.fillRect(0,0,W,H);
-
- // grid
- ctx.strokeStyle="rgba(76,110,135,.13)";ctx.lineWidth=1;
- for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
- for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-
- // static obstacles
- staticObs.forEach(r=>{
-   ctx.fillStyle="#273746";ctx.strokeStyle="#4b6172";ctx.lineWidth=1;
-   ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeRect(r.x,r.y,r.w,r.h);
- });
- // planned route
- ctx.strokeStyle="#22d3ee";ctx.lineWidth=3;
- if(routeMode===0){
-   line([start,{x:350,y:470},{x:570,y:290},{x:goal.x, y:goal.y}]);
- }else{
-   line([start,{x:430,y:560},{x:610,y:500},{x:goal.x,y:goal.y}]);
- }
- // dynamic obstacles
- dyn.forEach(o=>{
-   ctx.save();ctx.translate(o.x,o.y);
-   ctx.fillStyle="#b4233c";ctx.strokeStyle="#fb7185";ctx.lineWidth=2;
-   ctx.fillRect(-25,-10,55,20);ctx.fillRect(-10,-35,20,70);
-   ctx.strokeRect(-25,-10,55,20);ctx.strokeRect(-10,-35,20,70);
-   ctx.restore();
- });
- // start / goal
- ctx.fillStyle="#3b82f6";ctx.beginPath();ctx.arc(start.x,start.y,9,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#facc15";ctx.beginPath();ctx.arc(goal.x,goal.y,12,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#dbeafe";ctx.font="12px Segoe UI";ctx.fillText("START",start.x-20,start.y+25);ctx.fillText("GOAL",goal.x-15,goal.y-20);
-
- // safety corridor
- ctx.strokeStyle="rgba(74,222,128,.22)";ctx.lineWidth=2;
- ctx.beginPath();ctx.arc(ugv.x,ugv.y,52,0,Math.PI*2);ctx.stroke();
- ctx.fillStyle="#4ade80";ctx.beginPath();ctx.arc(ugv.x,ugv.y,13,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#0b1621";ctx.beginPath();ctx.arc(ugv.x,ugv.y,5,0,Math.PI*2);ctx.fill();
-
- // heading
- ctx.strokeStyle="#4ade80";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ugv.x,ugv.y);ctx.lineTo(ugv.x+22,ugv.y-14);ctx.stroke();
-
- if(replanning && !finished){
-   ctx.fillStyle="rgba(251,113,133,.12)";ctx.fillRect(0,0,W,H);
-   ctx.fillStyle="#fb7185";ctx.font="bold 18px Segoe UI";ctx.fillText("⚠ PREDICTIVE HAZARD — REPLANNING",24,32);
- }
-}
-
-function loop(now){
- const dt=Math.min((now-lastTime)/1000,.035);lastTime=now;
- update(dt);draw();requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-document.getElementById("pause").onclick=()=>{
- paused=!paused;
- document.getElementById("pause").textContent=paused?"Resume":"Pause";
- if(paused)addLog("Simulation paused."); else addLog("Simulation resumed.");
-};
-document.getElementById("reset").onclick=()=>{
- ugv={x:start.x,y:start.y};routeMode=0;replanning=false;finished=false;
- dyn[0].x=280;dyn[0].y=350;dyn[0].vx=115;dyn[0].vy=0;
- dyn[1].x=560;dyn[1].y=320;dyn[1].vx=-130;dyn[1].vy=0;
- dyn[2].x=500;dyn[2].y=175;dyn[2].vx=0;dyn[2].vy=115;
- dyn[3].x=820;dyn[3].y=300;dyn[3].vx=0;dyn[3].vy=-125;
- document.getElementById("decision").textContent="FOLLOW ROUTE";
- document.getElementById("decision").className="decision cyan";
- document.getElementById("reason").textContent="Route clear. Monitoring dynamic environment.";
- addLog("System reset.<br>Dynamic perception online.");
-};
+let dyn=JSON.parse(JSON.stringify(baseDyn));
+function resize(){const r=canvas.getBoundingClientRect();canvas.width=r.width*devicePixelRatio;canvas.height=r.height*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);cell=Math.min((r.width-50)/COLS,(r.height-80)/ROWS);ox=25;oy=42}addEventListener('resize',resize);resize();
+function key(a){return a[0]+','+a[1]}
+function near(n,set,rad){for(let r=n[0]-rad;r<=n[0]+rad;r++)for(let c=n[1]-rad;c<=n[1]+rad;c++)if(set.has(r+','+c))return true;return false}
+function dynCells(){let s=new Set(),shape=[[0,0],[1,0],[2,0],[2,1],[2,2]];dyn.forEach((o,i)=>{let r=Math.round(o.r),c=Math.round(o.c);shape.forEach(([a,b])=>{let rr=r+a,cc=c+b;if(rr>=0&&rr<ROWS&&cc>=0&&cc<COLS)s.add(rr+','+cc)})});return s}
+function neigh(n){let out=[];for(const [dr,dc,cost] of [[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,1.414],[-1,1,1.414],[1,-1,1.414],[1,1,1.414]]){let r=n[0]+dr,c=n[1]+dc;if(r>=0&&r<ROWS&&c>=0&&c<COLS)out.push([[r,c],cost])}return out}
+function riskCost(n,obs){if(obs.has(key(n)))return 9999;let md=99;for(const x of obs){let [r,c]=x.split(',').map(Number);md=Math.min(md,Math.hypot(n[0]-r,n[1]-c))}return md<=1.1?9:md<=2.1?4:md<=3.1?1.5:0}
+function astar(s,g,obs){let pq=[[0,s]],came=new Map(),gs=new Map([[key(s),0]]),nodes=new Map([[key(s),s]]);while(pq.length){pq.sort((a,b)=>a[0]-b[0]);let [,cur]=pq.shift();if(key(cur)===key(g)){let p=[cur],k=key(cur);while(came.has(k)){cur=came.get(k);p.push(cur);k=key(cur)}return p.reverse()}for(const [n,step] of neigh(cur)){if(obs.has(key(n)))continue;let ng=gs.get(key(cur))+step+riskCost(n,obs),nk=key(n);if(ng<(gs.get(nk)??Infinity)){gs.set(nk,ng);came.set(nk,cur);nodes.set(nk,n);pq.push([ng+Math.hypot(n[0]-g[0],n[1]-g[1]),n])}}}return []}
+function pathRisk(p,obs){if(!p.length)return 100;let score=10;for(const n of p){if(obs.has(key(n)))return 100;if(near(n,obs,1))score+=2.5;if(near(n,obs,2))score+=.8}return Math.min(99,Math.round(score))}
+function reset(){dyn=JSON.parse(JSON.stringify(baseDyn));ugv=[...START];complete=false;paused=false;replanCooldown=0;eventTimer=2.5;idx=0;document.getElementById('pause').textContent='P Pause';let obs=new Set([...fixed,...dynCells()]);path=astar(START,GOAL,obs);setStatus('CONTINUE','Current route has low predicted collision risk.',18,.92,'NORMAL','MISSION STARTED')}
+function setStatus(dec,reason,risk,conf,margin,event){document.getElementById('decision').textContent=dec;document.getElementById('decision').className='big '+(dec==='REPLAN'?'red':dec==='MISSION COMPLETE'?'yellow':dec==='CAUTIOUS'?'yellow':'cyan');document.getElementById('reason').textContent=reason;let re=document.getElementById('risk');re.textContent=risk+'/100';re.className='right '+(risk>=70?'red':risk>=35?'yellow':'green');document.getElementById('conf').textContent=Math.round(conf*100)+'%';document.getElementById('margin').textContent=margin;document.getElementById('margin').className='right '+(margin==='LARGE'?'green':margin==='CAUTIOUS'?'yellow':'');if(event)document.getElementById('event').textContent=event}
+function updateDyn(dt){dyn.forEach((o,i)=>{o.t+=dt;if(o.t<.08)return;let step=o.t*o.speed;o.t=0;o.r+=o.dr*step;o.c+=o.dc*step;if(i===0){if(o.c>=21){o.c=21;o.dc=-1}else if(o.c<=7){o.c=7;o.dc=1}}if(i===1){if(o.r>=15){o.r=15;o.dr=-1}else if(o.r<=4){o.r=4;o.dr=1}}if(i===2){if(o.c<=10){o.c=10;o.dc=1}else if(o.c>=24){o.c=24;o.dc=-1}}if(i===3){if(o.r<=9){o.r=9;o.dr=1}else if(o.r>=19){o.r=19;o.dr=-1}}})}
+function update(dt){if(paused||complete)return;updateDyn(dt);replanCooldown=Math.max(0,replanCooldown-dt);let obs=new Set([...fixed,...dynCells()]);let look=path.slice(idx,Math.min(path.length,idx+14));let threat=look.some(n=>near(n,dynCells(),2));if(threat&&replanCooldown<=0){let np=astar(ugv,GOAL,obs);if(np.length){path=np;idx=0;replanCooldown=1.2;setStatus('REPLAN','Moving obstacle detected ahead; safer route selected.',Math.max(72,pathRisk(path,obs)),.84,'LARGE','DYNAMIC OBSTACLE DETECTED — REPLANNING')}}else if(!threat&&eventTimer<=0&&!complete){let rr=Math.max(10,pathRisk(path,obs));setStatus(rr>=35?'CAUTIOUS':'CONTINUE',rr>=35?'Dynamic objects detected; monitoring the safety corridor.':'Current route has low predicted collision risk.',rr,rr>=35?.89:.92,rr>=35?'CAUTIOUS':'NORMAL',null)}
+eventTimer=Math.max(0,eventTimer-dt);moveTimer+=dt;if(moveTimer>=.075){moveTimer=0;if(idx<path.length-1){idx++;ugv=[...path[idx]]}else{complete=true;setStatus('MISSION COMPLETE','Goal reached successfully.',5,.96,'NORMAL','MISSION COMPLETE')}}document.getElementById('pos').textContent='Grid: ('+ugv[0]+', '+ugv[1]+')';document.getElementById('obs').textContent=obs.size}
+function center(n){return [ox+n[1]*cell+cell/2,oy+n[0]*cell+cell/2]}
+function draw(){let w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#161b21';ctx.fillRect(0,0,w,h);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){let x=ox+c*cell,y=oy+r*cell;ctx.fillStyle=(r+c)%2?'#26332b':'#2a3a30';ctx.fillRect(x,y,cell,cell);ctx.strokeStyle='#3b454f';ctx.strokeRect(x,y,cell,cell)}let obs=new Set([...fixed,...dynCells()]);for(const s of fixed){let [r,c]=s.split(',').map(Number);ctx.fillStyle='#963a3a';ctx.fillRect(ox+c*cell,oy+r*cell,cell,cell)}let dynset=dynCells();for(const s of dynset){let [r,c]=s.split(',').map(Number);ctx.fillStyle='#ff5b5b';ctx.fillRect(ox+c*cell+2,oy+r*cell+2,cell-4,cell-4);ctx.strokeStyle='#ff8585';ctx.strokeRect(ox+c*cell+2,oy+r*cell+2,cell-4,cell-4)}if(path.length>1){ctx.strokeStyle='#46bed2';ctx.lineWidth=4;ctx.beginPath();path.forEach((n,i)=>{let p=center(n);i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])});ctx.stroke()}let sp=center(START),gp=center(GOAL),up=center(ugv);ctx.fillStyle='#508cd8';ctx.beginPath();ctx.arc(sp[0],sp[1],Math.max(9,cell*.32),0,Math.PI*2);ctx.fill();ctx.fillStyle='#f0cd50';ctx.beginPath();ctx.arc(gp[0],gp[1],Math.max(10,cell*.36),0,Math.PI*2);ctx.fill();ctx.fillStyle='#50b464';ctx.beginPath();ctx.arc(up[0],up[1],Math.max(9,cell*.32),0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(up[0],up[1],Math.max(9,cell*.32),0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#5ab46e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(up[0],up[1],cell*1.55,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#ebEEF2';ctx.font='14px Arial';ctx.fillText('START',sp[0]-24,sp[1]+27);ctx.fillText('GOAL',gp[0]-20,gp[1]-20);if(document.getElementById('decision').textContent==='REPLAN'){ctx.fillStyle='rgba(255,80,80,.12)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#ff6666';ctx.font='bold 18px Arial';ctx.fillText('DYNAMIC OBSTACLE DETECTED — REPLANNING',24,28)}}
+let last=performance.now();function loop(t){let dt=Math.min((t-last)/1000,.05);last=t;update(dt);draw();requestAnimationFrame(loop)}
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')reset();if(e.key.toLowerCase()==='p'){paused=!paused;document.getElementById('pause').textContent=paused?'P Resume':'P Pause'}});document.getElementById('pause').onclick=()=>{paused=!paused;document.getElementById('pause').textContent=paused?'P Resume':'P Pause'};document.getElementById('reset').onclick=reset;reset();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
