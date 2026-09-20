@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UGV Autonomous Navigation Prototype</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#071018;color:#dbeafe;font-family:Inter,Segoe UI,Arial,sans-serif;overflow:hidden}
+.header{height:64px;background:#0b1520;border-bottom:1px solid #203244;display:flex;align-items:center;padding:0 24px;gap:14px}
+.dot{width:12px;height:12px;border-radius:50%;background:#22d3ee;box-shadow:0 0 14px #22d3ee}
+.title{font-size:19px;font-weight:700;letter-spacing:.3px}
+.sub{font-size:12px;color:#7f95aa;margin-left:auto}
+.app{height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(650px,1fr) 360px;gap:18px;padding:18px}
+.mapbox{position:relative;border:1px solid #24384b;border-radius:12px;background:#09131d;overflow:hidden;min-height:600px}
+canvas{width:100%;height:100%;display:block}
+.panel{border:1px solid #24384b;border-radius:12px;background:#0b1621;padding:18px;overflow:auto}
+.section{border-bottom:1px solid #203244;padding-bottom:14px;margin-bottom:14px}
+h2{font-size:14px;margin:0 0 12px;color:#93a9bd;text-transform:uppercase;letter-spacing:1px}
+.row{display:flex;justify-content:space-between;gap:12px;margin:9px 0;font-size:13px}
+.val{color:#fff;font-weight:600;text-align:right}
+.good{color:#4ade80}.warn{color:#fbbf24}.danger{color:#fb7185}.cyan{color:#22d3ee}
+.decision{font-size:24px;font-weight:800;letter-spacing:1px;margin:5px 0}
+.reason{font-size:13px;line-height:1.5;color:#a9bbca}
+button{border:1px solid #31506a;background:#122435;color:#dbeafe;border-radius:7px;padding:9px 14px;margin-right:8px;cursor:pointer}
+button:hover{background:#183047}
+.badge{display:inline-block;padding:4px 8px;border-radius:20px;background:#102b38;color:#67e8f9;font-size:11px}
+.legend{position:absolute;left:16px;bottom:14px;background:rgba(7,16,24,.86);border:1px solid #294053;border-radius:8px;padding:9px 12px;font-size:11px;line-height:1.8}
+.dot2{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+@media(max-width:900px){body{overflow:auto}.app{grid-template-columns:1fr}.mapbox{height:65vh}.panel{min-height:500px}}
+</style>
+</head>
+<body>
+<header class="header">
+  <span class="dot"></span>
+  <div class="title">GPS-DENIED UGV — RISK-AWARE NAVIGATION PROTOTYPE</div>
+  <div class="sub">Autonomous Navigation • Dynamic Obstacle Avoidance</div>
+</header>
+
+<div class="app">
+  <div class="mapbox">
+    <canvas id="map"></canvas>
+    <div class="legend">
+      <div><span class="dot2" style="background:#22d3ee"></span>Planned route</div>
+      <div><span class="dot2" style="background:#4ade80"></span>UGV + safety corridor</div>
+      <div><span class="dot2" style="background:#fb7185"></span>Dynamic obstacle</div>
+      <div><span class="dot2" style="background:#64748b"></span>Static obstacle</div>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>System Status</h2>
+      <div class="row"><span>UGV Position</span><span class="val" id="pos">--</span></div>
+      <div class="row"><span>Goal</span><span class="val">(900, 560)</span></div>
+      <div class="row"><span>Perception</span><span class="val good">ACTIVE</span></div>
+      <div class="row"><span>Risk Engine</span><span class="val good">ACTIVE</span></div>
+      <div class="row"><span>Localization</span><span class="val cyan" id="loc">96%</span></div>
+      <div class="row"><span>Moving Objects</span><span class="val" id="obj">4</span></div>
+    </div>
+
+    <div class="section">
+      <h2>Navigation Decision</h2>
+      <div class="decision cyan" id="decision">FOLLOW ROUTE</div>
+      <div class="reason" id="reason">Route clear. Monitoring dynamic environment.</div>
+      <div class="row" style="margin-top:14px"><span>Risk Score</span><span class="val good" id="risk">12 / 100</span></div>
+    </div>
+
+    <div class="section">
+      <h2>Autonomous Control</h2>
+      <button id="pause">Pause</button>
+      <button id="reset">Reset</button>
+      <span class="badge">AUTO MODE</span>
+      <div class="reason" style="margin-top:12px">
+        The UGV predicts whether moving obstacles will enter its safety corridor.
+        When risk becomes high, the route is automatically replanned before the obstacle reaches the vehicle.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Event Log</h2>
+      <div id="log" class="reason">System initialized.<br>Dynamic perception online.</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const c=document.getElementById("map"),ctx=c.getContext("2d");
+let W=1000,H=650,dpr=1;
+function resize(){
+  const r=c.getBoundingClientRect(); dpr=devicePixelRatio||1;
+  c.width=r.width*dpr;c.height=r.height*dpr;W=r.width;H=r.height;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",resize);resize();
+
+const start={x:80,y:575},goal={x:900,y:70};
+let ugv={x:start.x,y:start.y}, paused=false, replanning=false, finished=false;
+let routeMode=0, lastTime=performance.now(), eventText="System initialized.<br>Dynamic perception online.";
+const staticObs=[
+ {x:180,y:120,w:120,h:170},{x:420,y:80,w:120,h:125},
+ {x:650,y:205,w:150,h:105},{x:300,y:420,w:160,h:95},
+ {x:700,y:440,w:120,h:120}
+];
+const dyn=[
+ {x:280,y:350,vx:115,vy:0,phase:0},
+ {x:560,y:320,vx:-130,vy:0,phase:1},
+ {x:500,y:175,vx:0,vy:115,phase:2},
+ {x:820,y:300,vx:0,vy:-125,phase:3}
+];
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function rectDist(px,py,r){
+ const dx=Math.max(r.x-px,0,px-(r.x+r.w));
+ const dy=Math.max(r.y-py,0,py-(r.y+r.h));
+ return Math.hypot(dx,dy);
+}
+function addLog(s){eventText=s+"<br>"+eventText.split("<br>").slice(0,3).join("<br>");document.getElementById("log").innerHTML=eventText}
+
+function moveDyn(dt){
+ dyn.forEach((o,i)=>{
+   o.x+=o.vx*dt;o.y+=o.vy*dt;
+   if(o.vx && (o.x<140||o.x>850)){o.vx*=-1}
+   if(o.vy && (o.y<90||o.y>520)){o.vy*=-1}
+ });
+}
+
+function riskCheck(){
+ let min=999, threat=null;
+ dyn.forEach(o=>{
+   const d=dist(ugv,{x:o.x,y:o.y});
+   if(d<min){min=d;threat=o}
+ });
+ let risk=clamp(Math.round(100-(min-35)*1.15),8,96);
+ const corridor=115;
+ let near=false;
+ dyn.forEach(o=>{
+   const future={x:o.x+o.vx*0.9,y:o.y+o.vy*0.9};
+   if(dist(ugv,future)<corridor) near=true;
+ });
+ if(near && !replanning && !finished){
+   replanning=true;routeMode=1;
+   addLog("<span class='danger'>REPLAN TRIGGERED</span> — moving obstacle predicted inside safety corridor.");
+   document.getElementById("decision").textContent="REPLAN";
+   document.getElementById("decision").className="decision danger";
+   document.getElementById("reason").textContent="Predictive collision risk detected. Generating safer route around dynamic obstacle.";
+ }
+ if(!near && replanning){
+   replanning=false;
+   document.getElementById("decision").textContent="FOLLOW REPLANNED ROUTE";
+   document.getElementById("decision").className="decision good";
+   document.getElementById("reason").textContent="New route is clear. Autonomous navigation resumed.";
+   addLog("<span class='good'>ROUTE CLEAR</span> — continuing on replanned path.");
+ }
+ return {risk,min};
+}
+
+function routePoint(){
+  if(routeMode===0){
+    // smooth diagonal with waypoint
+    const t=clamp((ugv.y-start.y)/(goal.y-start.y),0,1);
+    return {x:start.x+(goal.x-start.x)*t,y:ugv.y-100};
+  } else {
+    // deliberately bend around the middle of the map after replan
+    if(ugv.x<430) return {x:430,y:560};
+    if(ugv.x<650) return {x:610,y:500};
+    return {x:goal.x,y:goal.y};
+  }
+}
+
+function update(dt){
+ if(paused||finished)return;
+ moveDyn(dt);
+ const rc=riskCheck();
+ let target=routePoint();
+ // General goal seeking with simple route waypoints
+ if(routeMode===0){
+   target={x:goal.x,y:goal.y};
+ } else {
+   if(ugv.x<430) target={x:430,y:560};
+   else if(ugv.x<650) target={x:610,y:500};
+   else target=goal;
+ }
+ const dx=target.x-ugv.x,dy=target.y-ugv.y,d=Math.hypot(dx,dy);
+ const speed=145;
+ if(d>3){ugv.x+=dx/d*speed*dt;ugv.y+=dy/d*speed*dt}
+ if(dist(ugv,goal)<12 && !finished){
+   finished=true;
+   document.getElementById("decision").textContent="MISSION COMPLETE";
+   document.getElementById("decision").className="decision good";
+   document.getElementById("reason").textContent="UGV reached the target while avoiding dynamic hazards.";
+   addLog("<span class='good'>MISSION COMPLETE</span>");
+ }
+ document.getElementById("pos").textContent=`(${Math.round(ugv.x)}, ${Math.round(ugv.y)})`;
+ document.getElementById("risk").textContent=`${rc.risk} / 100`;
+ document.getElementById("risk").className="val "+(rc.risk>70?"danger":rc.risk>40?"warn":"good");
+ document.getElementById("loc").textContent=`${Math.round(96-Math.min(rc.risk,60)*0.12)}%`;
+}
+
+function line(points,dash=false){
+ ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+ ctx.setLineDash(dash?[8,8]:[]);ctx.stroke();ctx.setLineDash([]);
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ ctx.fillStyle="#09131d";ctx.fillRect(0,0,W,H);
+
+ // grid
+ ctx.strokeStyle="rgba(76,110,135,.13)";ctx.lineWidth=1;
+ for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+ for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+ // static obstacles
+ staticObs.forEach(r=>{
+   ctx.fillStyle="#273746";ctx.strokeStyle="#4b6172";ctx.lineWidth=1;
+   ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeRect(r.x,r.y,r.w,r.h);
+ });
+ // planned route
+ ctx.strokeStyle="#22d3ee";ctx.lineWidth=3;
+ if(routeMode===0){
+   line([start,{x:350,y:470},{x:570,y:290},{x:goal.x, y:goal.y}]);
+ }else{
+   line([start,{x:430,y:560},{x:610,y:500},{x:goal.x,y:goal.y}]);
+ }
+ // dynamic obstacles
+ dyn.forEach(o=>{
+   ctx.save();ctx.translate(o.x,o.y);
+   ctx.fillStyle="#b4233c";ctx.strokeStyle="#fb7185";ctx.lineWidth=2;
+   ctx.fillRect(-25,-10,55,20);ctx.fillRect(-10,-35,20,70);
+   ctx.strokeRect(-25,-10,55,20);ctx.strokeRect(-10,-35,20,70);
+   ctx.restore();
+ });
+ // start / goal
+ ctx.fillStyle="#3b82f6";ctx.beginPath();ctx.arc(start.x,start.y,9,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#facc15";ctx.beginPath();ctx.arc(goal.x,goal.y,12,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#dbeafe";ctx.font="12px Segoe UI";ctx.fillText("START",start.x-20,start.y+25);ctx.fillText("GOAL",goal.x-15,goal.y-20);
+
+ // safety corridor
+ ctx.strokeStyle="rgba(74,222,128,.22)";ctx.lineWidth=2;
+ ctx.beginPath();ctx.arc(ugv.x,ugv.y,52,0,Math.PI*2);ctx.stroke();
+ ctx.fillStyle="#4ade80";ctx.beginPath();ctx.arc(ugv.x,ugv.y,13,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#0b1621";ctx.beginPath();ctx.arc(ugv.x,ugv.y,5,0,Math.PI*2);ctx.fill();
+
+ // heading
+ ctx.strokeStyle="#4ade80";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ugv.x,ugv.y);ctx.lineTo(ugv.x+22,ugv.y-14);ctx.stroke();
+
+ if(replanning && !finished){
+   ctx.fillStyle="rgba(251,113,133,.12)";ctx.fillRect(0,0,W,H);
+   ctx.fillStyle="#fb7185";ctx.font="bold 18px Segoe UI";ctx.fillText("⚠ PREDICTIVE HAZARD — REPLANNING",24,32);
+ }
+}
+
+function loop(now){
+ const dt=Math.min((now-lastTime)/1000,.035);lastTime=now;
+ update(dt);draw();requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById("pause").onclick=()=>{
+ paused=!paused;
+ document.getElementById("pause").textContent=paused?"Resume":"Pause";
+ if(paused)addLog("Simulation paused."); else addLog("Simulation resumed.");
+};
+document.getElementById("reset").onclick=()=>{
+ ugv={x:start.x,y:start.y};routeMode=0;replanning=false;finished=false;
+ dyn[0].x=280;dyn[0].y=350;dyn[0].vx=115;dyn[0].vy=0;
+ dyn[1].x=560;dyn[1].y=320;dyn[1].vx=-130;dyn[1].vy=0;
+ dyn[2].x=500;dyn[2].y=175;dyn[2].vx=0;dyn[2].vy=115;
+ dyn[3].x=820;dyn[3].y=300;dyn[3].vx=0;dyn[3].vy=-125;
+ document.getElementById("decision").textContent="FOLLOW ROUTE";
+ document.getElementById("decision").className="decision cyan";
+ document.getElementById("reason").textContent="Route clear. Monitoring dynamic environment.";
+ addLog("System reset.<br>Dynamic perception online.");
+};
+</script>
+</body>
+</html>
